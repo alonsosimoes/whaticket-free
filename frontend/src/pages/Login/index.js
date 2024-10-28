@@ -1,5 +1,6 @@
 import React, { useState, useContext } from "react";
 import { Link as RouterLink } from "react-router-dom";
+import logo from '../../assets/logo.png';
 
 import {
   Avatar,
@@ -18,23 +19,25 @@ import {
 import { LockOutlined, Visibility, VisibilityOff } from '@material-ui/icons';
 
 import { makeStyles } from "@material-ui/core/styles";
+import { versionSystem } from "../../../package.json";
+import { nomeEmpresa } from "../../../package.json";
 
 import { i18n } from "../../translate/i18n";
 
 import { AuthContext } from "../../context/Auth/AuthContext";
 
-// const Copyright = () => {
-// 	return (
-// 		<Typography variant="body2" color="textSecondary" align="center">
-// 			{"Copyleft "}
-// 			<Link color="inherit" href="https://github.com/canove">
-// 				Canove
-// 			</Link>{" "}
-// 			{new Date().getFullYear()}
-// 			{"."}
-// 		</Typography>
-// 	);
-// };
+const Copyright = () => {
+  return (
+    <Typography variant="body2" color="textSecondary" align="center">
+      © {new Date().getFullYear()}
+      {" - "}
+      <Link color="inherit" href="#">
+        { nomeEmpresa } - v { versionSystem }
+      </Link>
+      {"."}
+    </Typography>
+  );
+};
 
 const useStyles = makeStyles((theme) => ({
   paper: {
@@ -77,12 +80,7 @@ const Login = () => {
     <Container component="main" maxWidth="xs">
       <CssBaseline />
       <div className={classes.paper}>
-        <Avatar className={classes.avatar}>
-          <LockOutlined />
-        </Avatar>
-        <Typography component="h1" variant="h5">
-          {i18n.t("login.title")}
-        </Typography>
+      <img alt="logo" src={logo}></img>
         <form className={classes.form} noValidate onSubmit={handlSubmit}>
           <TextField
             variant="outlined"
