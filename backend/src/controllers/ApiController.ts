@@ -109,5 +109,12 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
     await SendWhatsAppMessage({ body, ticket: contactAndTicket, quotedMsg });
   }
 
-  return res.send();
+  setTimeout(async () => {
+    await UpdateTicketService({
+      ticketId: contactAndTicket.id,
+      ticketData: { status: "closed" }
+    });
+  }, 1000);
+  return res.send({ error: "SUCCESS" });
+  
 };

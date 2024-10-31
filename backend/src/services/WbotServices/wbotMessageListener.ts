@@ -115,8 +115,19 @@ const msgLocation = (image, latitude, longitude) => {
   }
 };
 
+export const adjustMessageStructure = (msg: proto.IWebMessageInfo): proto.IWebMessageInfo => {
+  if (msg.message?.ephemeralMessage) {
+    // Mescla `ephemeralMessage.message` com outras propriedades de `message`
+    msg.message = { ...msg.message, ...msg.message.ephemeralMessage.message };
+    // Remove `ephemeralMessage` após a mesclagem
+    delete msg.message.ephemeralMessage;
+  }
+  return msg;
+};
+
 export const getBodyMessage = (msg: proto.IWebMessageInfo): string | null => {
   try {
+    msg = adjustMessageStructure(msg);
     const type = getTypeMessage(msg);
 
     const types = {
