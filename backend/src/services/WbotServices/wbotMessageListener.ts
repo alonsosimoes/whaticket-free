@@ -158,6 +158,7 @@ export const getBodyMessage = (msg: proto.IWebMessageInfo): string | null => {
       ),
       liveLocationMessage: `Latitude: ${msg.message.liveLocationMessage?.degreesLatitude} - Longitude: ${msg.message.liveLocationMessage?.degreesLongitude}`,
       documentMessage: msg.message.documentMessage?.title,
+      documentWithCaptionMessage: msg.message?.documentWithCaptionMessage?.message.documentMessage.caption,
       audioMessage: "Áudio",
       listMessage: getBodyButton(msg) || msg.message.listResponseMessage?.title,
       viewOnceMessage: getBodyButton(msg),
@@ -249,7 +250,8 @@ const downloadMedia = async (msg: proto.IWebMessageInfo) => {
     msg.message?.videoMessage ||
     msg.message?.stickerMessage ||
     msg.message?.documentMessage ||
-    msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
+    msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage ||
+    msg.message?.documentWithCaptionMessage.message.documentMessage;
 
   // eslint-disable-next-line no-nested-ternary
   const messageType = msg.message?.documentMessage
@@ -278,7 +280,8 @@ const downloadMedia = async (msg: proto.IWebMessageInfo) => {
           msg.message?.templateMessage?.fourRowTemplate?.imageMessage ||
           msg.message?.templateMessage?.hydratedTemplate?.imageMessage ||
           msg.message?.templateMessage?.hydratedFourRowTemplate?.imageMessage ||
-          msg.message?.interactiveMessage?.header?.imageMessage,
+          msg.message?.interactiveMessage?.header?.imageMessage ||
+          msg.message?.documentWithCaptionMessage.message.documentMessage,
         messageType
       );
     } catch (error) {
@@ -478,7 +481,8 @@ const isValidMsg = (msg: proto.IWebMessageInfo): boolean => {
       msgType === "protocolMessage" ||
       msgType === "listResponseMessage" ||
       msgType === "listMessage" ||
-      msgType === "viewOnceMessage";
+      msgType === "viewOnceMessage" ||
+      msgType === "documentWithCaptionMessage";
 
     if (!ifType) {
       logger.warn(`#### Nao achou o type em isValidMsg: ${msgType}
@@ -793,7 +797,7 @@ const handleMessage = async (
       msg.message?.documentMessage ||
       msg.message.stickerMessage ||
       msg.message?.extendedTextMessage?.contextInfo?.quotedMessage
-        ?.imageMessage;
+        ?.imageMessage || msg.message?.documentWithCaptionMessage?.message.documentMessage;
 
     if (msg.key.fromMe) {
       if (/\u200e/.test(bodyMessage)) return;
