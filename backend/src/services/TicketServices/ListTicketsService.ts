@@ -10,7 +10,6 @@ import TicketTag from "../../models/TicketTag";
 import Whatsapp from "../../models/Whatsapp";
 import ShowUserService from "../UserServices/ShowUserService";
 
-
 interface Request {
   searchParam?: string;
   pageNumber?: string;
@@ -30,25 +29,60 @@ interface Response {
   hasMore: boolean;
 }
 
-const ListTicketsService = async ({
-  searchParam = "",
-  pageNumber = "1",
-  queueIds,
-  tags,
-  status,
-  date,
-  updatedAt,
-  showAll,
-  userId,
-  withUnreadMessages
-}: Request): Promise<Response> => {
+// Controle global para abortar requisições
+let currentAbortController: AbortController | null = null;
+
+// Função principal do serviço
+const ListTicketsService = async (params: Request): Promise<Response> => {
+  // Aborta a requisição anterior, se existir
+  if (currentAbortController) {
+    currentAbortController.abort();
+  }
+
+  // Cria um novo controlador para a requisição atual
+  currentAbortController = new AbortController();
+
+  try {
+    const result = await ListTicketsServiceInternal(params, currentAbortController.signal);
+    return result;
+  } catch (error) {
+    if (error.name === "AbortError") {
+      console.log("Requisição cancelada.");
+      return { tickets: [], count: 0, hasMore: false };
+    }
+    throw error; // Outros erros são lançados
+  } finally {
+    currentAbortController = null; // Limpa o controlador após a requisição
+  }
+};
+
+// Função interna que realiza a consulta
+const ListTicketsServiceInternal = async (
+  {
+    searchParam = "",
+    pageNumber = "1",
+    queueIds,
+    tags,
+    status,
+    date,
+    updatedAt,
+    showAll,
+    userId,
+    withUnreadMessages
+  }: Request,
+  signal?: AbortSignal // Recebe o AbortSignal
+): Promise<Response> => {
+  // Verifica se a requisição foi cancelada antes de começar
+  if (signal?.aborted) {
+    throw new Error("Requisição cancelada");
+  }
+
   let whereCondition: Filterable["where"] = {
     [Op.or]: [{ userId }, { status: "pending" }],
     queueId: { [Op.or]: [queueIds, null] }
   };
-  let includeCondition: Includeable[];
 
-  includeCondition = [
+  let includeCondition: Includeable[] = [
     {
       model: Contact,
       as: "contact",
@@ -83,36 +117,23 @@ const ListTicketsService = async ({
   }
 
   if (searchParam) {
-    const sanitizedSearchParam = searchParam.toLocaleLowerCase().trim();
+    const sanitizedSearchParam = searchParam.toLowerCase().trim();
 
-    includeCondition = [
-      ...includeCondition,
-      {
-        model: Message,
-        as: "messages",
-        attributes: ["id", "body"],
-        where: {
-          body: where(
-            fn("LOWER", col("body")),
-            "LIKE",
-            `%${sanitizedSearchParam}%`
-          )
-        },
-        required: false,
-        duplicating: false
-      }
-    ];
+    includeCondition.push({
+      model: Message,
+      as: "messages",
+      attributes: ["id", "body"],
+      where: {
+        body: where(fn("LOWER", col("body")), "LIKE", `%${sanitizedSearchParam}%`)
+      },
+      required: false,
+      duplicating: false
+    });
 
     whereCondition = {
       ...whereCondition,
       [Op.or]: [
-        {
-          "$contact.name$": where(
-            fn("LOWER", col("contact.name")),
-            "LIKE",
-            `%${sanitizedSearchParam}%`
-          )
-        },
+        { "$contact.name$": where(fn("LOWER", col("contact.name")), "LIKE", `%${sanitizedSearchParam}%`) },
         { "$contact.number$": { [Op.like]: `%${sanitizedSearchParam}%` } },
         {
           "$message.body$": where(
@@ -127,6 +148,7 @@ const ListTicketsService = async ({
 
   if (date) {
     whereCondition = {
+      ...whereCondition,
       createdAt: {
         [Op.between]: [+startOfDay(parseISO(date)), +endOfDay(parseISO(date))]
       }
@@ -135,11 +157,9 @@ const ListTicketsService = async ({
 
   if (updatedAt) {
     whereCondition = {
+      ...whereCondition,
       updatedAt: {
-        [Op.between]: [
-          +startOfDay(parseISO(updatedAt)),
-          +endOfDay(parseISO(updatedAt))
-        ]
+        [Op.between]: [+startOfDay(parseISO(updatedAt)), +endOfDay(parseISO(updatedAt))]
       }
     };
   }
@@ -156,20 +176,16 @@ const ListTicketsService = async ({
   }
 
   if (Array.isArray(tags) && tags.length > 0) {
-    const ticketsTagFilter = [];
-    for (let tag of tags) {
-      const ticketTags = await TicketTag.findAll({ where: { tagId: tag } });
-      if (ticketTags) {
-        ticketsTagFilter.push(ticketTags.map(t => t.ticketId));
-      }
-    }
+    const ticketTags = await TicketTag.findAll({
+      where: { tagId: { [Op.in]: tags } },
+      attributes: ["ticketId"]
+    });
 
-    const ticketsIntersection: number[] = intersection(...ticketsTagFilter);
+    const ticketsIntersection = intersection(ticketTags.map(tag => tag.ticketId));
 
     whereCondition = {
-      id: {
-        [Op.in]: ticketsIntersection
-      }
+      ...whereCondition,
+      id: { [Op.in]: ticketsIntersection }
     };
   }
 
