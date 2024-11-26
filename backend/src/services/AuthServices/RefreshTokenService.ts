@@ -25,23 +25,33 @@ export const RefreshTokenService = async (
   res: Res,
   token: string
 ): Promise<Response> => {
-  try {
-    const decoded = verify(token, authConfig.refreshSecret);
-    const { id, tokenVersion } = decoded as RefreshTokenPayload;
+  if (!token) {
+    res.clearCookie("jrt"); // Certifique-se de limpar o cookie
+    throw new AppError("Refresh token não fornecido", 401);
+  }
 
+  try {
+    // Decodifica e verifica o token usando o segredo configurado
+    const decoded = verify(token, authConfig.refreshSecret) as RefreshTokenPayload;
+
+    const { id, tokenVersion } = decoded;
+
+    // Recupera o usuário pelo ID
     const user = await ShowUserService(id);
 
+    // Verifica se a versão do token no banco de dados é válida
     if (user.tokenVersion !== tokenVersion) {
       res.clearCookie("jrt");
-      throw new AppError("ERR_SESSION_EXPIRED", 401);
+      throw new AppError("Sessão expirada, autenticação necessária", 401);
     }
 
+    // Gera novos tokens
     const newToken = createAccessToken(user);
     const refreshToken = createRefreshToken(user);
 
     return { user, newToken, refreshToken };
   } catch (err) {
     res.clearCookie("jrt");
-    throw new AppError("ERR_SESSION_EXPIRED", 401);
+    throw new AppError("Sessão expirada ou token inválido", 401);
   }
 };
