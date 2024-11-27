@@ -122,6 +122,13 @@ export const adjustMessageStructure = (msg: proto.IWebMessageInfo): proto.IWebMe
     // Remove `ephemeralMessage` após a mesclagem
     delete msg.message.ephemeralMessage;
   }
+
+  if (msg.message?.editedMessage) {
+    // Mescla `editedMessage.message` com outras propriedades de `message`
+    msg.message = { ...msg.message, ...msg.message.editedMessage.message };
+    delete msg.message.editedMessage;
+  }
+
   return msg;
 };
 
@@ -339,7 +346,7 @@ const verifyContact = async (
 
   const contactData = {
     name: msgContact?.name || msgContact.id.replace(/\D/g, ""),
-    number: msgContact.id.replace(/\D/g, ""),
+    number: msgContact.id.substr(0, msgContact.id.indexOf("@")),
     profilePicUrl,
     isGroup: msgContact.id.includes("g.us")
   };
